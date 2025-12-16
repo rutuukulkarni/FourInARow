@@ -34,7 +34,7 @@ A modern, responsive, and feature-rich implementation of the classic Connect Fou
 
 ## 🚀 Live Demo
 
-[Play the Game Here](https://your-username.github.io/four-in-a-row)
+[Play the Game Here]([https://your-username.github.io/four-in-a-row](https://four-in-a-row-sandy.vercel.app/))
 
 ## 📦 Installation
 
