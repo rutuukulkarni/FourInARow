@@ -66,71 +66,111 @@ export const useSupabaseGame = () => {
 
       if (error) throw error;
 
+      // Subscribe FIRST to get real-time updates
+      subscribeToRoom(code);
+
       setRoom(data);
       setRoomCode(code);
       setPlayerNumber(Player.ONE);
       setIsWaiting(true);
       setIsConnected(true);
       setError(null);
-
-      // Subscribe to room updates
-      subscribeToRoom(code);
     } catch (err: any) {
       setError(err.message || 'Failed to create room');
       console.error('Error creating room:', err);
     }
-  }, []);
+  }, [subscribeToRoom]);
 
   // Join an existing room
   const joinRoom = useCallback(async (code: string) => {
     try {
       const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const roomCodeUpper = code.toUpperCase();
       
-      // Check if room exists
+      // Check if room exists first
       const { data: existingRoom, error: fetchError } = await supabase
         .from('game_rooms')
         .select('*')
-        .eq('room_code', code.toUpperCase())
+        .eq('room_code', roomCodeUpper)
         .single();
 
       if (fetchError || !existingRoom) {
         throw new Error('Room not found');
       }
 
+      // Check if room is already full
       if (existingRoom.player2_id) {
-        throw new Error('Room is full');
+        // Subscribe and set room so they can see/watch the game
+        subscribeToRoom(roomCodeUpper);
+        setRoom(existingRoom);
+        setRoomCode(roomCodeUpper);
+        setPlayerNumber(Player.TWO);
+        setIsWaiting(false);
+        setIsConnected(true);
+        setError('Room is already full. You can watch the game.');
+        return;
       }
 
-      // Join the room
+      // Subscribe FIRST to get real-time updates
+      subscribeToRoom(roomCodeUpper);
+
+      // Try to join the room atomically
       const { data, error } = await supabase
         .from('game_rooms')
         .update({
           player2_id: playerId,
           game_status: 'playing'
         })
-        .eq('room_code', code.toUpperCase())
+        .eq('room_code', roomCodeUpper)
+        .is('player2_id', null) // Only update if player2_id is still null (prevents race condition)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If update failed, check if someone else joined
+        const { data: checkRoom } = await supabase
+          .from('game_rooms')
+          .select('*')
+          .eq('room_code', roomCodeUpper)
+          .single();
+        
+        if (checkRoom?.player2_id) {
+          // Room was taken, but set it up anyway so they can watch
+          setRoom(checkRoom);
+          setRoomCode(roomCodeUpper);
+          setPlayerNumber(Player.TWO);
+          setIsWaiting(false);
+          setIsConnected(true);
+          setError('Room was just filled. You can watch the game.');
+          return;
+        }
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('Failed to join room. Please try again.');
+      }
 
       setRoom(data);
-      setRoomCode(code.toUpperCase());
+      setRoomCode(roomCodeUpper);
       setPlayerNumber(Player.TWO);
       setIsWaiting(false);
       setIsConnected(true);
       setError(null);
-
-      // Subscribe to room updates
-      subscribeToRoom(code.toUpperCase());
     } catch (err: any) {
       setError(err.message || 'Failed to join room');
       console.error('Error joining room:', err);
     }
-  }, []);
+  }, [subscribeToRoom]);
 
   // Subscribe to room updates
   const subscribeToRoom = useCallback((code: string) => {
+    // Remove any existing subscription for this room
+    const existingChannel = supabase.getChannels().find(ch => ch.topic === `room:${code}`);
+    if (existingChannel) {
+      supabase.removeChannel(existingChannel);
+    }
+
     const channel = supabase
       .channel(`room:${code}`)
       .on(
@@ -142,6 +182,7 @@ export const useSupabaseGame = () => {
           filter: `room_code=eq.${code.toUpperCase()}`
         },
         (payload) => {
+          console.log('Room update received:', payload);
           if (payload.new) {
             const updatedRoom = payload.new as GameRoom;
             setRoom(updatedRoom);
@@ -150,10 +191,32 @@ export const useSupabaseGame = () => {
             // Game is ready when both players are present and status is 'playing'
             const gameReady = updatedRoom.player2_id && updatedRoom.game_status === 'playing';
             setIsWaiting(!gameReady);
+            
+            // Clear error if game is ready
+            if (gameReady) {
+              setError(null);
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          // Fetch current room state after subscribing
+          supabase
+            .from('game_rooms')
+            .select('*')
+            .eq('room_code', code.toUpperCase())
+            .single()
+            .then(({ data, error }) => {
+              if (!error && data) {
+                setRoom(data);
+                const gameReady = data.player2_id && data.game_status === 'playing';
+                setIsWaiting(!gameReady);
+              }
+            });
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
