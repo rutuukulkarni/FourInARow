@@ -146,9 +146,10 @@ export const useSupabaseGame = () => {
             const updatedRoom = payload.new as GameRoom;
             setRoom(updatedRoom);
             
-            if (updatedRoom.player2_id && updatedRoom.game_status === 'playing') {
-              setIsWaiting(false);
-            }
+            // Update waiting state when game is ready
+            // Game is ready when both players are present and status is 'playing'
+            const gameReady = updatedRoom.player2_id && updatedRoom.game_status === 'playing';
+            setIsWaiting(!gameReady);
           }
         }
       )
@@ -250,6 +251,7 @@ export const useSupabaseGame = () => {
 
   return {
     ...gameState,
+    room, // Expose room object for checking player2_id and game_status
     roomCode,
     playerNumber,
     isConnected,
