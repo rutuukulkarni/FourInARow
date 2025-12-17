@@ -9,7 +9,8 @@ export enum Player {
 
 export enum GameMode {
   VS_PLAYER = 'vs_player',
-  VS_BOT = 'vs_bot'
+  VS_BOT = 'vs_bot',
+  ONLINE = 'online'
 }
 
 export enum BotDifficulty {

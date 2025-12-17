@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Board } from './components/Board/Board';
 import { GameControls } from './components/GameControls';
+import { OnlineLobby } from './components/OnlineGame/OnlineLobby';
 import { useGameLogic } from './hooks/useGameLogic';
+import { useSupabaseGame } from './hooks/useSupabaseGame';
 import { GameMode, GameStatus } from './utils/constants';
 import { Settings, Keyboard } from 'lucide-react';
 import { Modal } from './components/UI/Modal';
@@ -10,28 +12,74 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // Local game logic (for VS Player and VS Bot)
+  const localGame = useGameLogic();
+  
+  // Online game logic (for Online mode)
+  const onlineGame = useSupabaseGame();
+
+  // Determine which game to use based on mode
+  const gameMode = localGame.gameMode;
+  const isOnlineMode = gameMode === GameMode.ONLINE;
+  
+  // Use online game data when in online mode, otherwise use local game
   const {
     board,
     currentPlayer,
-    gameMode,
-    setGameMode,
-    botDifficulty,
-    setBotDifficulty,
     gameStatus,
     winningPositions,
-    handleMove,
-    resetGame
-  } = useGameLogic();
+    handleMove: localHandleMove,
+    resetGame: localResetGame,
+    setGameMode,
+    botDifficulty,
+    setBotDifficulty
+  } = localGame;
+
+  const {
+    board: onlineBoard,
+    currentPlayer: onlineCurrentPlayer,
+    gameStatus: onlineGameStatus,
+    winningPositions: onlineWinningPositions,
+    makeMove: onlineMakeMove,
+    resetGame: onlineResetGame,
+    roomCode,
+    isWaiting,
+    error: onlineError
+  } = onlineGame;
+
+  // Select active game data
+  const activeBoard = isOnlineMode ? onlineBoard : board;
+  const activeCurrentPlayer = isOnlineMode ? onlineCurrentPlayer : currentPlayer;
+  const activeGameStatus = isOnlineMode ? onlineGameStatus : gameStatus;
+  const activeWinningPositions = isOnlineMode ? onlineWinningPositions : winningPositions;
 
   const handleColumnClick = (colIndex: number) => {
-    if (gameStatus === GameStatus.PLAYING) {
-      handleMove(colIndex);
+    if (isOnlineMode) {
+      if (activeGameStatus === GameStatus.PLAYING) {
+        onlineMakeMove(colIndex);
+      }
+    } else {
+      if (activeGameStatus === GameStatus.PLAYING) {
+        localHandleMove(colIndex);
+      }
+    }
+  };
+
+  const handleResetGame = () => {
+    if (isOnlineMode) {
+      onlineResetGame();
+    } else {
+      localResetGame();
     }
   };
 
   const handleGameModeChange = (mode: GameMode) => {
     setGameMode(mode);
-    resetGame();
+    if (mode === GameMode.ONLINE) {
+      // Don't reset, let online game handle it
+    } else {
+      localResetGame();
+    }
   };
 
   const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
@@ -47,17 +95,17 @@ function App() {
       }
 
       if (e.key === 'r' || e.key === 'R') {
-        resetGame();
+        handleResetGame();
       }
 
       if (e.key === 'Escape') {
-        resetGame();
+        handleResetGame();
       }
     };
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gameStatus, handleColumnClick, resetGame]);
+  }, [activeGameStatus, handleColumnClick, handleResetGame]);
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
@@ -88,30 +136,30 @@ function App() {
             <div className="flex justify-center items-center gap-4 mb-3">
               {/* Player Turn/Winner Status */}
               <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${
-                gameStatus === GameStatus.WIN
-                  ? winningPositions.length > 0 && board[winningPositions[0].row][winningPositions[0].col] === 1
+                activeGameStatus === GameStatus.WIN
+                  ? activeWinningPositions.length > 0 && activeBoard[activeWinningPositions[0].row][activeWinningPositions[0].col] === 1
                     ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
                     : 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                  : gameStatus === GameStatus.DRAW
+                  : activeGameStatus === GameStatus.DRAW
                   ? 'bg-gray-500 text-white'
-                  : currentPlayer === 1
+                  : activeCurrentPlayer === 1
                   ? 'bg-red-100 text-red-700 border-2 border-red-300'
                   : 'bg-blue-100 text-blue-700 border-2 border-blue-300'
               }`}>
-                {gameStatus === GameStatus.WIN && (
+                {activeGameStatus === GameStatus.WIN && (
                   <span className="text-lg">🎉</span>
                 )}
-                {gameStatus === GameStatus.DRAW && (
+                {activeGameStatus === GameStatus.DRAW && (
                   <span className="text-lg">🤝</span>
                 )}
                 <span>
-                  {gameStatus === GameStatus.WIN
-                    ? winningPositions.length > 0 && board[winningPositions[0].row][winningPositions[0].col] === 1
+                  {activeGameStatus === GameStatus.WIN
+                    ? activeWinningPositions.length > 0 && activeBoard[activeWinningPositions[0].row][activeWinningPositions[0].col] === 1
                       ? 'Player 1 Wins!'
                       : gameMode === GameMode.VS_BOT ? 'AI Bot Wins!' : 'Player 2 Wins!'
-                    : gameStatus === GameStatus.DRAW
+                    : activeGameStatus === GameStatus.DRAW
                     ? "It's a Draw!"
-                    : currentPlayer === 1
+                    : activeCurrentPlayer === 1
                     ? "Player 1's Turn"
                     : gameMode === GameMode.VS_BOT ? "AI Bot's Turn" : "Player 2's Turn"}
                 </span>
@@ -121,7 +169,7 @@ function App() {
             {/* Small Player Indicators - Centered */}
             <div className="flex justify-center items-center gap-6">
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
-                currentPlayer === 1 && gameStatus === GameStatus.PLAYING
+                activeCurrentPlayer === 1 && activeGameStatus === GameStatus.PLAYING
                   ? 'bg-red-50 border-2 border-red-300 shadow-sm'
                   : 'bg-gray-50'
               }`}>
@@ -130,7 +178,7 @@ function App() {
                 <span className="text-gray-500">(Red)</span>
               </div>
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
-                currentPlayer === 2 && gameStatus === GameStatus.PLAYING
+                activeCurrentPlayer === 2 && activeGameStatus === GameStatus.PLAYING
                   ? 'bg-blue-50 border-2 border-blue-300 shadow-sm'
                   : 'bg-gray-50'
               }`}>
@@ -143,10 +191,10 @@ function App() {
             </div>
 
             {/* Play Again Button - Show when game over */}
-            {gameStatus === GameStatus.WIN || gameStatus === GameStatus.DRAW ? (
+            {activeGameStatus === GameStatus.WIN || activeGameStatus === GameStatus.DRAW ? (
               <div className="flex justify-center mt-4">
                 <button
-                  onClick={resetGame}
+                  onClick={handleResetGame}
                   className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-md"
                 >
                   Play Again
@@ -155,19 +203,36 @@ function App() {
             ) : null}
           </div>
 
-          {/* Game Board - Main Focus in Center */}
-          <div className="flex justify-center">
-            <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl p-6 w-full max-w-2xl">
-              <Board
-                board={board}
-                winningPositions={winningPositions}
-                onColumnClick={handleColumnClick}
-                currentPlayer={currentPlayer}
-                gameStatus={gameStatus}
-                gameMode={gameMode}
-              />
+          {/* Online Lobby - Show when in online mode and waiting/not connected */}
+          {isOnlineMode && (isWaiting || !roomCode) && (
+            <div className="flex justify-center mb-6">
+              <div className="w-full max-w-md">
+                <OnlineLobby
+                  roomCode={roomCode}
+                  isWaiting={isWaiting}
+                  error={onlineError}
+                  onCreateRoom={onlineGame.createRoom}
+                  onJoinRoom={onlineGame.joinRoom}
+                />
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Game Board - Main Focus in Center */}
+          {(!isOnlineMode || (roomCode && !isWaiting)) && (
+            <div className="flex justify-center">
+              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl p-6 w-full max-w-2xl">
+                <Board
+                  board={activeBoard}
+                  winningPositions={activeWinningPositions}
+                  onColumnClick={handleColumnClick}
+                  currentPlayer={activeCurrentPlayer}
+                  gameStatus={activeGameStatus}
+                  gameMode={gameMode}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Settings Modal */}
           <Modal
@@ -180,7 +245,7 @@ function App() {
               botDifficulty={botDifficulty}
               onGameModeChange={handleGameModeChange}
               onDifficultyChange={handleDifficultyChange}
-              onResetGame={resetGame}
+              onResetGame={handleResetGame}
               onResetStats={() => { }}
               isGameActive={gameStatus === GameStatus.PLAYING}
             />

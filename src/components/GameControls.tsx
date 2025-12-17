@@ -2,7 +2,7 @@ import React from 'react';
 import { GameMode, BotDifficulty } from '../utils/constants';
 import { Card } from './UI/Card';
 import { Button } from './UI/Button';
-import { Users, Bot, Settings, RefreshCw } from 'lucide-react';
+import { Users, Bot, Settings, RefreshCw, Globe } from 'lucide-react';
 
 interface GameControlsProps {
   gameMode: GameMode;
@@ -35,22 +35,33 @@ export const GameControls: React.FC<GameControlsProps> = ({
       {/* Game Mode Selection */}
       <div className="space-y-3">
         <h4 className="font-semibold text-gray-700">Game Mode</h4>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <Button
             variant={gameMode === GameMode.VS_PLAYER ? 'primary' : 'outline'}
             onClick={() => onGameModeChange(GameMode.VS_PLAYER)}
             fullWidth
+            size="sm"
           >
-            <Users className="w-4 h-4 mr-2" />
-            VS Player
+            <Users className="w-4 h-4 mr-1" />
+            Local
           </Button>
           <Button
             variant={gameMode === GameMode.VS_BOT ? 'secondary' : 'outline'}
             onClick={() => onGameModeChange(GameMode.VS_BOT)}
             fullWidth
+            size="sm"
           >
-            <Bot className="w-4 h-4 mr-2" />
-            VS Bot
+            <Bot className="w-4 h-4 mr-1" />
+            Bot
+          </Button>
+          <Button
+            variant={gameMode === GameMode.ONLINE ? 'primary' : 'outline'}
+            onClick={() => onGameModeChange(GameMode.ONLINE)}
+            fullWidth
+            size="sm"
+          >
+            <Globe className="w-4 h-4 mr-1" />
+            Online
           </Button>
         </div>
       </div>
