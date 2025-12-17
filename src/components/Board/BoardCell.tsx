@@ -23,11 +23,11 @@ export const BoardCell: React.FC<BoardCellProps> = ({
   return (
     <button
       onClick={onClick}
-      className="relative w-12 h-12 p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex-shrink-0"
+      className="relative p-0.5 sm:p-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex-shrink-0 touch-manipulation w-full aspect-square"
       aria-label={`Cell at row ${rowIndex + 1}, column ${colIndex + 1}, ${player === Player.NONE ? 'empty' : 'occupied'}`}
       data-testid={`cell-${rowIndex}-${colIndex}`}
     >
-      <div className="w-full h-full rounded-full flex items-center justify-center overflow-hidden transition-transform duration-300 hover:scale-105">
+      <div className="w-full h-full rounded-full flex items-center justify-center overflow-hidden transition-transform duration-300 active:scale-105">
         {/* Background disc */}
         <div 
           className="absolute inset-1 rounded-full"

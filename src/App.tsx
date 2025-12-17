@@ -109,33 +109,33 @@ function App() {
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Floating Action Buttons - No Header */}
-      <div className="fixed top-4 right-4 z-40 flex gap-2">
+      {/* Floating Action Buttons - Responsive */}
+      <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-40 flex gap-2">
         <button
           onClick={() => setShowShortcuts(true)}
-          className="p-3 bg-white/90 backdrop-blur-md hover:bg-white shadow-lg hover:shadow-xl rounded-full transition-all transform hover:scale-110 text-gray-700 hover:text-gray-900"
+          className="p-2.5 sm:p-3 bg-white/90 backdrop-blur-md active:bg-white shadow-lg active:shadow-xl rounded-full transition-all active:scale-95 text-gray-700 active:text-gray-900 touch-manipulation"
           title="Keyboard Shortcuts"
           aria-label="Show keyboard shortcuts"
         >
-          <Keyboard className="w-5 h-5" />
+          <Keyboard className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
         <button
           onClick={() => setShowSettings(true)}
-          className="p-3 bg-white/90 backdrop-blur-md hover:bg-white shadow-lg hover:shadow-xl rounded-full transition-all transform hover:scale-110 text-gray-700 hover:text-gray-900"
+          className="p-2.5 sm:p-3 bg-white/90 backdrop-blur-md active:bg-white shadow-lg active:shadow-xl rounded-full transition-all active:scale-95 text-gray-700 active:text-gray-900 touch-manipulation"
           title="Game Settings"
           aria-label="Show game settings"
         >
-          <Settings className="w-5 h-5" />
+          <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
       </div>
 
-      <main className="container mx-auto px-4 py-6 h-full overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+      <main className="container mx-auto px-2 sm:px-4 py-3 sm:py-6 h-full overflow-y-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         <div className="max-w-4xl mx-auto">
-          {/* Small Player Status - Centered at Top */}
-          <div className="mb-6">
-            <div className="flex justify-center items-center gap-4 mb-3">
+          {/* Small Player Status - Centered at Top - Responsive */}
+          <div className="mb-4 sm:mb-6">
+            <div className="flex justify-center items-center gap-2 sm:gap-4 mb-2 sm:mb-3 px-2">
               {/* Player Turn/Winner Status */}
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold ${
+              <div className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold ${
                 activeGameStatus === GameStatus.WIN
                   ? activeWinningPositions.length > 0 && activeBoard[activeWinningPositions[0].row][activeWinningPositions[0].col] === 1
                     ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white'
@@ -147,12 +147,12 @@ function App() {
                   : 'bg-blue-100 text-blue-700 border-2 border-blue-300'
               }`}>
                 {activeGameStatus === GameStatus.WIN && (
-                  <span className="text-lg">🎉</span>
+                  <span className="text-base sm:text-lg">🎉</span>
                 )}
                 {activeGameStatus === GameStatus.DRAW && (
-                  <span className="text-lg">🤝</span>
+                  <span className="text-base sm:text-lg">🤝</span>
                 )}
-                <span>
+                <span className="whitespace-nowrap">
                   {activeGameStatus === GameStatus.WIN
                     ? activeWinningPositions.length > 0 && activeBoard[activeWinningPositions[0].row][activeWinningPositions[0].col] === 1
                       ? 'Player 1 Wins!'
@@ -166,36 +166,36 @@ function App() {
               </div>
             </div>
 
-            {/* Small Player Indicators - Centered */}
-            <div className="flex justify-center items-center gap-6">
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
+            {/* Small Player Indicators - Centered - Responsive */}
+            <div className="flex justify-center items-center gap-3 sm:gap-6 px-2">
+              <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs transition-all ${
                 activeCurrentPlayer === 1 && activeGameStatus === GameStatus.PLAYING
                   ? 'bg-red-50 border-2 border-red-300 shadow-sm'
                   : 'bg-gray-50'
               }`}>
-                <div className="w-3 h-3 rounded-full bg-red-500" />
-                <span className="font-medium text-gray-700">Player 1</span>
-                <span className="text-gray-500">(Red)</span>
+                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 flex-shrink-0" />
+                <span className="font-medium text-gray-700 text-xs sm:text-xs">Player 1</span>
+                <span className="text-gray-500 text-xs sm:text-xs hidden xs:inline">(Red)</span>
               </div>
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all ${
+              <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs transition-all ${
                 activeCurrentPlayer === 2 && activeGameStatus === GameStatus.PLAYING
                   ? 'bg-blue-50 border-2 border-blue-300 shadow-sm'
                   : 'bg-gray-50'
               }`}>
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="font-medium text-gray-700">
+                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="font-medium text-gray-700 text-xs sm:text-xs">
                   {gameMode === GameMode.VS_BOT ? 'AI Bot' : 'Player 2'}
                 </span>
-                <span className="text-gray-500">(Blue)</span>
+                <span className="text-gray-500 text-xs sm:text-xs hidden xs:inline">(Blue)</span>
               </div>
             </div>
 
-            {/* Play Again Button - Show when game over */}
+            {/* Play Again Button - Show when game over - Responsive */}
             {activeGameStatus === GameStatus.WIN || activeGameStatus === GameStatus.DRAW ? (
-              <div className="flex justify-center mt-4">
+              <div className="flex justify-center mt-3 sm:mt-4">
                 <button
                   onClick={handleResetGame}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-md"
+                  className="px-5 sm:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold text-sm sm:text-base active:from-blue-700 active:to-purple-700 transition-all shadow-md active:scale-95 touch-manipulation min-h-[44px]"
                 >
                   Play Again
                 </button>
@@ -218,10 +218,10 @@ function App() {
             </div>
           )}
 
-          {/* Game Board - Main Focus in Center */}
+          {/* Game Board - Main Focus in Center - Responsive */}
           {(!isOnlineMode || (roomCode && !isWaiting)) && (
-            <div className="flex justify-center">
-              <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl p-6 w-full max-w-2xl">
+            <div className="flex justify-center px-2 sm:px-4">
+              <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-4 md:p-6 w-full max-w-2xl">
                 <Board
                   board={activeBoard}
                   winningPositions={activeWinningPositions}

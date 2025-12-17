@@ -45,13 +45,13 @@ export const Board: React.FC<BoardProps> = ({
   };
 
   return (
-    <div className="relative">
-      {/* Game board */}
-      <div className="bg-gradient-to-br from-blue-800 to-blue-900 rounded-2xl p-6 shadow-2xl relative">
-        {/* Winner Message Overlay - On Board */}
+    <div className="relative w-full">
+      {/* Game board - Responsive */}
+      <div className="bg-gradient-to-br from-blue-800 to-blue-900 rounded-xl sm:rounded-2xl p-3 sm:p-4 md:p-6 shadow-2xl relative w-full overflow-hidden">
+        {/* Winner Message Overlay - On Board - Responsive */}
         {isGameOver && (
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-2xl flex items-center justify-center z-50">
-            <div className={`px-8 py-6 rounded-2xl shadow-2xl transform animate-bounce ${
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-xl sm:rounded-2xl flex items-center justify-center z-50 p-4">
+            <div className={`px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 rounded-xl sm:rounded-2xl shadow-2xl transform animate-bounce max-w-[90%] ${
               gameStatus === GameStatus.WIN
                 ? winnerPlayer === 1
                   ? 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500'
@@ -59,10 +59,10 @@ export const Board: React.FC<BoardProps> = ({
                 : 'bg-gradient-to-r from-gray-500 to-gray-600'
             } text-white`}>
               <div className="text-center">
-                <div className="text-5xl mb-3">
+                <div className="text-3xl sm:text-4xl md:text-5xl mb-2 sm:mb-3">
                   {gameStatus === GameStatus.WIN ? '🏆' : '🤝'}
                 </div>
-                <div className="text-3xl font-bold">
+                <div className="text-lg sm:text-2xl md:text-3xl font-bold break-words">
                   {getWinnerMessage()}
                 </div>
               </div>
@@ -70,20 +70,22 @@ export const Board: React.FC<BoardProps> = ({
           </div>
         )}
 
-        {/* Column indicators */}
-        <div className="flex justify-around mb-2">
+        {/* Column indicators - Responsive */}
+        <div className="flex justify-around mb-1 sm:mb-2 gap-1">
           {columns.map((_, index) => (
-            <div 
+            <button
               key={`indicator-${index}`}
-              className="w-12 text-center text-white font-bold text-lg"
+              onClick={() => onColumnClick(index)}
+              className="w-8 sm:w-10 md:w-12 text-center text-white font-bold text-sm sm:text-base md:text-lg hover:scale-110 active:scale-95 transition-transform touch-manipulation min-h-[44px] flex items-center justify-center"
+              aria-label={`Drop piece in column ${index + 1}`}
             >
               {index + 1}
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Board columns */}
-        <div className="flex flex-row justify-center items-start gap-2">
+        {/* Board columns - Responsive */}
+        <div className="flex flex-row justify-center items-start gap-1 sm:gap-1.5 md:gap-2">
           {columns.map((column, colIndex) => (
             <BoardColumn
               key={colIndex}
@@ -95,14 +97,15 @@ export const Board: React.FC<BoardProps> = ({
           ))}
         </div>
 
-        {/* Bottom border */}
-        <div className="mt-6 h-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full" />
+        {/* Bottom border - Responsive */}
+        <div className="mt-3 sm:mt-4 md:mt-6 h-1.5 sm:h-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 rounded-full" />
       </div>
 
-      {/* Instructions */}
+      {/* Instructions - Responsive */}
       {!isGameOver && (
-        <div className="mt-6 text-center text-gray-600 text-sm">
-          <p>Click on a column number above to drop your piece</p>
+        <div className="mt-3 sm:mt-4 md:mt-6 text-center text-gray-600 text-xs sm:text-sm px-2">
+          <p className="hidden sm:block">Click on a column number above to drop your piece</p>
+          <p className="sm:hidden">Tap column number to drop piece</p>
         </div>
       )}
     </div>
