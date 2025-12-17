@@ -29,9 +29,10 @@ export const BoardColumn: React.FC<BoardColumnProps> = ({
           transition-all duration-200 flex-shrink-0
           ${isColumnFull 
             ? 'bg-gray-300 cursor-not-allowed' 
-            : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:scale-110 active:scale-95 shadow-lg hover:shadow-xl'
+            : 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 hover:brightness-110 active:brightness-95 shadow-lg hover:shadow-xl'
           }
         `}
+        style={{ willChange: 'auto' }}
         aria-label={`Drop piece in column ${colIndex + 1}`}
         data-testid={`column-${colIndex}`}
       >
