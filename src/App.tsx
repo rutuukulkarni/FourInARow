@@ -66,6 +66,7 @@ function App() {
     }
   };
 
+  
   const handleResetGame = () => {
     if (isOnlineMode) {
       onlineResetGame();
@@ -107,6 +108,17 @@ function App() {
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [activeGameStatus, handleColumnClick, handleResetGame]);
+
+  // Debug info (only in development)
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('🔍 App Debug Info:');
+      console.log('- Game Mode:', gameMode);
+      console.log('- Is Online Mode:', isOnlineMode);
+      console.log('- Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing');
+      console.log('- Supabase Key:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing');
+    }
+  }, [gameMode, isOnlineMode]);
 
   return (
     <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
