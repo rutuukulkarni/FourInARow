@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, GameRoom } from '../lib/supabase';
-import { Board, Player } from '../utils/gameLogic';
+import { Board, Player, getBoardState, makeMove } from '../utils/gameLogic';
 import { GameStatus } from '../utils/constants';
-import { getBoardState } from '../utils/gameLogic';
 
 function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -239,7 +238,6 @@ export const useSupabaseGame = () => {
 
     try {
       const board = room.board as Board;
-      const { makeMove } = await import('../utils/gameLogic');
       const newBoard = makeMove(board, col, playerNumber as Player);
 
       if (!newBoard) {
