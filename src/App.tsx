@@ -95,11 +95,11 @@ function App() {
         const colIndex = parseInt(e.key) - 1;
         handleColumnClick(colIndex);
       }
-
+      
       if (e.key === 'r' || e.key === 'R') {
         handleResetGame();
       }
-
+      
       if (e.key === 'Escape') {
         handleResetGame();
       }
@@ -111,12 +111,13 @@ function App() {
 
   // Debug info (only in development)
   useEffect(() => {
-    if (import.meta.env.DEV) {
+    if ((import.meta as any).env?.DEV) {
       console.log('🔍 App Debug Info:');
       console.log('- Game Mode:', gameMode);
       console.log('- Is Online Mode:', isOnlineMode);
-      console.log('- Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing');
-      console.log('- Supabase Key:', import.meta.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing');
+      const env = (import.meta as any).env;
+      console.log('- Supabase URL:', env?.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing');
+      console.log('- Supabase Key:', env?.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing');
     }
   }, [gameMode, isOnlineMode]);
 
@@ -178,7 +179,7 @@ function App() {
                 </span>
               </div>
             </div>
-
+            
             {/* Small Player Indicators - Centered - Responsive */}
             <div className="flex justify-center items-center gap-3 sm:gap-6 px-2">
               <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs transition-all ${
@@ -189,7 +190,7 @@ function App() {
                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 flex-shrink-0" />
                 <span className="font-medium text-gray-700 text-xs sm:text-xs">Player 1</span>
                 <span className="text-gray-500 text-xs sm:text-xs hidden xs:inline">(Red)</span>
-              </div>
+                </div>
               <div className={`flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs transition-all ${
                 activeCurrentPlayer === 2 && activeGameStatus === GameStatus.PLAYING
                   ? 'bg-blue-50 border-2 border-blue-300 shadow-sm'
@@ -198,7 +199,7 @@ function App() {
                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-blue-500 flex-shrink-0" />
                 <span className="font-medium text-gray-700 text-xs sm:text-xs">
                   {gameMode === GameMode.VS_BOT ? 'AI Bot' : 'Player 2'}
-                </span>
+                  </span>
                 <span className="text-gray-500 text-xs sm:text-xs hidden xs:inline">(Blue)</span>
               </div>
             </div>
@@ -227,9 +228,9 @@ function App() {
                   error={onlineError}
                   onCreateRoom={onlineGame.createRoom}
                   onJoinRoom={onlineGame.joinRoom}
-                />
-              </div>
+              />
             </div>
+          </div>
           )}
 
           {/* Game Board - Main Focus in Center - Responsive */}
@@ -243,8 +244,8 @@ function App() {
                   onColumnClick={handleColumnClick}
                   currentPlayer={activeCurrentPlayer}
                   gameStatus={activeGameStatus}
-                  gameMode={gameMode}
-                />
+              gameMode={gameMode}
+            />
               </div>
             </div>
           )}
@@ -293,9 +294,9 @@ function App() {
                   <div className="text-sm font-semibold text-orange-700 mb-2">Close Modal</div>
                   <div className="font-mono text-xl font-bold text-orange-600">ESC</div>
                   <div className="text-xs text-orange-600 mt-2">Close this dialog</div>
-                </div>
-              </div>
-              
+          </div>
+        </div>
+
               <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                 <h3 className="font-semibold text-gray-800 mb-2">💡 Tips</h3>
                 <ul className="text-sm text-gray-600 space-y-1">
@@ -304,13 +305,13 @@ function App() {
                   <li>• Click on column numbers or drop arrows to play</li>
                   <li>• Connect 4 discs in a row to win!</li>
                 </ul>
-              </div>
+          </div>
             </div>
           </Modal>
         </div>
       </main>
 
-
+     
     </div>
   );
 }
