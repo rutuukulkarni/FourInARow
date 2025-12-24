@@ -15,6 +15,7 @@ export const useSupabaseGame = () => {
   const [isWaiting, setIsWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('disconnected');
+  const [activeChannel, setActiveChannel] = useState<any>(null); // Store active channel reference
 
   // Convert room board to game state
   const getGameState = useCallback((room: GameRoom | null) => {
@@ -49,6 +50,7 @@ export const useSupabaseGame = () => {
   const fetchRoomState = useCallback(async (code: string) => {
     const roomCodeUpper = code.toUpperCase();
     try {
+      console.log('🔄 Fetching room state for:', roomCodeUpper);
       const { data, error } = await supabase
         .from('game_rooms')
         .select('*')
@@ -62,11 +64,22 @@ export const useSupabaseGame = () => {
 
       if (data) {
         console.log('📋 Fetched room state:', data);
+        console.log('  - player2_id:', data.player2_id);
+        console.log('  - game_status:', data.game_status);
+        
+        // Update room state immediately
         setRoom(data);
+        
+        // Update waiting state - game is ready when both players are present
         const gameReady = data.player2_id && data.game_status === 'playing';
+        console.log('  - gameReady:', gameReady);
         setIsWaiting(!gameReady);
+        
         if (gameReady) {
           setError(null);
+          console.log('✅ Game is ready - both players connected');
+        } else {
+          console.log('⏳ Still waiting for player 2');
         }
         return data;
       }
@@ -85,7 +98,10 @@ export const useSupabaseGame = () => {
     const existingChannels = supabase.getChannels().filter(ch => 
       ch.topic?.includes(`room:${roomCodeUpper}`) || ch.topic === `room:${roomCodeUpper}`
     );
-    existingChannels.forEach(ch => supabase.removeChannel(ch));
+    existingChannels.forEach(ch => {
+      console.log('🗑️ Removing existing channel:', ch.topic);
+      supabase.removeChannel(ch);
+    });
 
     console.log(`🔌 Subscribing to room: ${roomCodeUpper}`);
     setSubscriptionStatus('connecting');
@@ -118,7 +134,8 @@ export const useSupabaseGame = () => {
             console.log('  - current_player:', updatedRoom.current_player);
             console.log('  - board:', updatedRoom.board);
             
-            // Only update if this is a different state (avoid unnecessary re-renders)
+            // Always update room state when we receive real-time updates
+            // This ensures Player 2 sees Master's moves immediately
             setRoom(prevRoom => {
               if (prevRoom && 
                   JSON.stringify(prevRoom.board) === JSON.stringify(updatedRoom.board) &&
@@ -127,7 +144,7 @@ export const useSupabaseGame = () => {
                 console.log('  - No state change needed (already in sync)');
                 return prevRoom;
               }
-              console.log('  - Updating room state');
+              console.log('  - ⚡ Updating room state from real-time');
               return updatedRoom;
             });
             
@@ -153,35 +170,48 @@ export const useSupabaseGame = () => {
           console.error('❌ Subscription error:', err);
           setError(`Connection error: ${err.message}`);
           setIsConnected(false);
+          setActiveChannel(null);
         }
         
         if (status === 'SUBSCRIBED') {
           console.log('✅ Successfully subscribed to room updates');
+          console.log('  - Channel topic:', channel.topic);
+          console.log('  - Channel state:', channel.state);
           setIsConnected(true);
-          // Fetch current room state after subscribing
-          fetchRoomState(roomCodeUpper);
+          setActiveChannel(channel); // Store channel reference
+          
+          // Verify subscription is active
+          const channels = supabase.getChannels();
+          console.log('  - Active channels:', channels.map(ch => ({ topic: ch.topic, state: ch.state })));
+          
+          // Fetch current room state immediately after subscribing (don't wait)
+          fetchRoomState(roomCodeUpper).then(() => {
+            console.log('📋 Room state fetched after subscription');
+          });
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Channel error - Real-time may not be enabled');
           setError('Real-time connection failed. Using polling fallback...');
           setIsConnected(false);
+          setActiveChannel(null);
           // Start polling as fallback
           startPolling(roomCodeUpper);
         } else if (status === 'TIMED_OUT') {
           console.error('❌ Subscription timed out - Using polling fallback');
           setError('Connection timed out. Using polling fallback...');
           setIsConnected(false);
+          setActiveChannel(null);
           // Start polling as fallback
           startPolling(roomCodeUpper);
         } else if (status === 'CLOSED') {
           console.warn('⚠️ Channel closed');
           setIsConnected(false);
+          setActiveChannel(null);
         }
       });
 
-    return () => {
-      console.log(`🔌 Unsubscribing from room: ${roomCodeUpper}`);
-      supabase.removeChannel(channel);
-    };
+    // Store channel reference - don't return cleanup immediately
+    // We'll handle cleanup in useEffect
+    return channel;
   }, [fetchRoomState]);
 
   // Polling fallback when real-time fails
@@ -264,8 +294,9 @@ export const useSupabaseGame = () => {
         return;
       }
 
-      // Subscribe FIRST to get real-time updates
-      subscribeToRoom(roomCodeUpper);
+      // Subscribe FIRST to get real-time updates - CRITICAL for receiving Master's moves
+      const channel = subscribeToRoom(roomCodeUpper);
+      console.log('🔌 Player 2 subscription channel created:', channel?.topic);
 
       // Try to join the room atomically
       const { data, error } = await supabase
@@ -304,12 +335,36 @@ export const useSupabaseGame = () => {
         throw new Error('Failed to join room. Please try again.');
       }
 
+      console.log('✅ Player 2 joined successfully:', data);
+      console.log('  - Subscription channel active:', channel?.state);
+      console.log('  - All active channels:', supabase.getChannels().map(ch => ({ topic: ch.topic, state: ch.state })));
+      
+      // Immediately update state for player 2
       setRoom(data);
       setRoomCode(roomCodeUpper);
       setPlayerNumber(Player.TWO);
       setIsWaiting(false);
       setIsConnected(true);
       setError(null);
+      
+      // Verify subscription is still active after join and re-subscribe if needed
+      setTimeout(() => {
+        const channels = supabase.getChannels();
+        const ourChannel = channels.find(ch => ch.topic === `room:${roomCodeUpper}`);
+        console.log('🔍 Verifying subscription after join:');
+        console.log('  - Our channel:', ourChannel ? { topic: ourChannel.topic, state: ourChannel.state } : 'NOT FOUND');
+        console.log('  - All channels:', channels.map(ch => ({ topic: ch.topic, state: ch.state })));
+        
+        if (!ourChannel || ourChannel.state !== 'joined') {
+          console.warn('⚠️ Subscription not active! Re-subscribing...');
+          subscribeToRoom(roomCodeUpper);
+        } else {
+          console.log('✅ Subscription verified and active');
+        }
+        
+        // Fetch room state to ensure sync
+        fetchRoomState(roomCodeUpper);
+      }, 500);
     } catch (err: any) {
       setError(err.message || 'Failed to join room');
       console.error('❌ Error joining room:', err);
@@ -421,22 +476,64 @@ export const useSupabaseGame = () => {
     }
   }, [roomCode]);
 
-  // Polling fallback effect - only poll if real-time is not connected
+  // Polling fallback effect - poll more aggressively when waiting
   useEffect(() => {
-    if (!roomCode || subscriptionStatus === 'SUBSCRIBED') return; // Don't poll if real-time is working
+    if (!roomCode) return;
     
-    console.log('🔄 Setting up polling fallback for room:', roomCode);
-    const cleanup = startPolling(roomCode);
+    // If subscribed and not waiting, real-time should handle it
+    if (subscriptionStatus === 'SUBSCRIBED' && !isWaiting) {
+      return;
+    }
     
-    return cleanup;
-  }, [roomCode, subscriptionStatus, startPolling]);
+    // If waiting for player 2, poll more frequently (every 1 second)
+    if (isWaiting) {
+      console.log('🔄 Setting up aggressive polling (waiting for player 2):', roomCode);
+      const intervalId = setInterval(() => {
+        console.log('🔄 Polling room state (waiting mode)');
+        fetchRoomState(roomCode);
+      }, 1000); // Poll every 1 second when waiting
+      return () => {
+        clearInterval(intervalId);
+        console.log('🛑 Stopped aggressive polling');
+      };
+    }
+    
+    // If not subscribed, use normal polling fallback
+    if (subscriptionStatus !== 'SUBSCRIBED') {
+      console.log('🔄 Setting up polling fallback for room:', roomCode);
+      const cleanup = startPolling(roomCode);
+      return cleanup;
+    }
+  }, [roomCode, subscriptionStatus, isWaiting, startPolling, fetchRoomState]);
+
+  // Maintain subscription - ensure it stays active
+  useEffect(() => {
+    if (!roomCode) return;
+
+    // Verify subscription is active periodically
+    const verifyInterval = setInterval(() => {
+      const channels = supabase.getChannels();
+      const ourChannel = channels.find(ch => ch.topic === `room:${roomCode.toUpperCase()}`);
+      
+      if (!ourChannel || ourChannel.state !== 'joined') {
+        console.warn('⚠️ Subscription lost! Re-subscribing...');
+        subscribeToRoom(roomCode);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => {
+      clearInterval(verifyInterval);
+    };
+  }, [roomCode, subscribeToRoom]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (roomCode) {
-        const channel = supabase.getChannels().find(ch => ch.topic === `room:${roomCode}`);
+        const channels = supabase.getChannels();
+        const channel = channels.find(ch => ch.topic === `room:${roomCode.toUpperCase()}`);
         if (channel) {
+          console.log('🗑️ Cleaning up channel on unmount:', channel.topic);
           supabase.removeChannel(channel);
         }
       }

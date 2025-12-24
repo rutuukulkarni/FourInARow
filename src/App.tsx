@@ -221,7 +221,7 @@ function App() {
 
           {/* Online Lobby - Show when in online mode and waiting/not connected */}
           {/* Show lobby only if: no room code OR (room exists but waiting for player 2) */}
-          {isOnlineMode && (!roomCode || (onlineRoom && !onlineRoom.player2_id && onlineRoom.game_status === 'waiting')) && (
+          {isOnlineMode && (!roomCode || isWaiting || (onlineRoom && !onlineRoom.player2_id && onlineRoom.game_status === 'waiting')) && (
             <div className="flex justify-center mb-4 sm:mb-6">
               <div className="w-full max-w-md px-2">
                 <OnlineLobby
@@ -238,8 +238,8 @@ function App() {
           )}
 
           {/* Game Board - Main Focus in Center - Responsive */}
-          {/* Show board if: not online mode OR (online mode AND room exists AND game is playing/finished) */}
-          {(!isOnlineMode || (roomCode && onlineRoom && onlineRoom.game_status !== 'waiting')) && (
+          {/* Show board if: not online mode OR (online mode AND room exists AND game is ready) */}
+          {(!isOnlineMode || (roomCode && onlineRoom && onlineRoom.player2_id && (onlineRoom.game_status === 'playing' || onlineRoom.game_status === 'finished'))) && (
             <div className="flex justify-center px-2 sm:px-4">
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-4 md:p-6 w-full max-w-2xl">
                 <Board
