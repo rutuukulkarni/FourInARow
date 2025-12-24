@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
-import { Users, UserPlus, Copy, Check, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, Copy, Check, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface OnlineLobbyProps {
   roomCode: string | null;
@@ -9,6 +9,8 @@ interface OnlineLobbyProps {
   error: string | null;
   onCreateRoom: () => void;
   onJoinRoom: (roomCode: string) => void;
+  onRefresh?: () => void;
+  subscriptionStatus?: string;
 }
 
 export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
@@ -16,7 +18,9 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
   isWaiting,
   error,
   onCreateRoom,
-  onJoinRoom
+  onJoinRoom,
+  onRefresh,
+  subscriptionStatus
 }) => {
   const [joinRoomCode, setJoinRoomCode] = useState('');
   const [copied, setCopied] = useState(false);
@@ -30,6 +34,9 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
   };
 
   if (roomCode && isWaiting) {
+    const isConnected = subscriptionStatus === 'SUBSCRIBED';
+    const isPolling = subscriptionStatus !== 'SUBSCRIBED' && subscriptionStatus !== 'connecting' && subscriptionStatus !== 'disconnected';
+    
     return (
       <Card className="p-4 sm:p-6 text-center">
         <Users className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-blue-500" />
@@ -51,9 +58,25 @@ export const OnlineLobby: React.FC<OnlineLobbyProps> = ({
             )}
           </button>
         </div>
-        <p className="text-xs sm:text-sm text-gray-500 animate-pulse">
-          ⏳ Waiting for opponent to join...
-        </p>
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <p className="text-xs sm:text-sm text-gray-500 animate-pulse">
+            ⏳ Waiting for opponent to join...
+          </p>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="p-1.5 active:bg-gray-100 rounded transition-all touch-manipulation"
+              title="Refresh room status"
+            >
+              <RefreshCw className="w-4 h-4 text-gray-500" />
+            </button>
+          )}
+        </div>
+        {!isConnected && (
+          <p className="text-xs text-amber-600 mt-2">
+            {isPolling ? '🔄 Using polling (real-time unavailable)' : '⚠️ Real-time connection failed - using polling'}
+          </p>
+        )}
       </Card>
     );
   }

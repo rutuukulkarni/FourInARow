@@ -45,7 +45,9 @@ function App() {
     room: onlineRoom,
     roomCode,
     isWaiting,
-    error: onlineError
+    error: onlineError,
+    subscriptionStatus,
+    refreshRoom
   } = onlineGame;
 
   // Select active game data
@@ -228,6 +230,8 @@ function App() {
                   error={onlineError}
                   onCreateRoom={onlineGame.createRoom}
                   onJoinRoom={onlineGame.joinRoom}
+                  onRefresh={refreshRoom}
+                  subscriptionStatus={subscriptionStatus}
               />
             </div>
           </div>

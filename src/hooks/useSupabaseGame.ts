@@ -14,6 +14,7 @@ export const useSupabaseGame = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('disconnected');
 
   // Convert room board to game state
   const getGameState = useCallback((room: GameRoom | null) => {
@@ -44,6 +45,38 @@ export const useSupabaseGame = () => {
     };
   }, []);
 
+  // Fetch room state manually (polling fallback)
+  const fetchRoomState = useCallback(async (code: string) => {
+    const roomCodeUpper = code.toUpperCase();
+    try {
+      const { data, error } = await supabase
+        .from('game_rooms')
+        .select('*')
+        .eq('room_code', roomCodeUpper)
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching room state:', error);
+        return null;
+      }
+
+      if (data) {
+        console.log('📋 Fetched room state:', data);
+        setRoom(data);
+        const gameReady = data.player2_id && data.game_status === 'playing';
+        setIsWaiting(!gameReady);
+        if (gameReady) {
+          setError(null);
+        }
+        return data;
+      }
+      return null;
+    } catch (err) {
+      console.error('❌ Error in fetchRoomState:', err);
+      return null;
+    }
+  }, []);
+
   // Subscribe to room updates - MUST be defined before createRoom/joinRoom
   const subscribeToRoom = useCallback((code: string) => {
     const roomCodeUpper = code.toUpperCase();
@@ -55,6 +88,7 @@ export const useSupabaseGame = () => {
     existingChannels.forEach(ch => supabase.removeChannel(ch));
 
     console.log(`🔌 Subscribing to room: ${roomCodeUpper}`);
+    setSubscriptionStatus('connecting');
 
     const channel = supabase
       .channel(`room:${roomCodeUpper}`, {
@@ -74,11 +108,14 @@ export const useSupabaseGame = () => {
           console.log('📨 Real-time update received:', payload);
           if (payload.new) {
             const updatedRoom = payload.new as GameRoom;
-            console.log('✅ Room updated:', updatedRoom);
+            console.log('✅ Room updated via real-time:', updatedRoom);
+            console.log('  - player2_id:', updatedRoom.player2_id);
+            console.log('  - game_status:', updatedRoom.game_status);
             setRoom(updatedRoom);
             
             // Update waiting state when game is ready
             const gameReady = updatedRoom.player2_id && updatedRoom.game_status === 'playing';
+            console.log('  - gameReady:', gameReady);
             setIsWaiting(!gameReady);
             
             // Clear error if game is ready
@@ -92,35 +129,31 @@ export const useSupabaseGame = () => {
       )
       .subscribe((status, err) => {
         console.log(`📡 Subscription status for ${roomCodeUpper}:`, status);
+        setSubscriptionStatus(status);
+        
         if (err) {
           console.error('❌ Subscription error:', err);
           setError(`Connection error: ${err.message}`);
+          setIsConnected(false);
         }
+        
         if (status === 'SUBSCRIBED') {
           console.log('✅ Successfully subscribed to room updates');
           setIsConnected(true);
           // Fetch current room state after subscribing
-          supabase
-            .from('game_rooms')
-            .select('*')
-            .eq('room_code', roomCodeUpper)
-            .single()
-            .then(({ data, error }) => {
-              if (error) {
-                console.error('❌ Error fetching room:', error);
-              } else if (data) {
-                console.log('📋 Current room state:', data);
-                setRoom(data);
-                const gameReady = data.player2_id && data.game_status === 'playing';
-                setIsWaiting(!gameReady);
-              }
-            });
+          fetchRoomState(roomCodeUpper);
         } else if (status === 'CHANNEL_ERROR') {
           console.error('❌ Channel error - Real-time may not be enabled');
-          setError('Real-time connection failed. Please check Supabase configuration.');
+          setError('Real-time connection failed. Using polling fallback...');
+          setIsConnected(false);
+          // Start polling as fallback
+          startPolling(roomCodeUpper);
         } else if (status === 'TIMED_OUT') {
-          console.error('❌ Subscription timed out');
-          setError('Connection timed out. Please try again.');
+          console.error('❌ Subscription timed out - Using polling fallback');
+          setError('Connection timed out. Using polling fallback...');
+          setIsConnected(false);
+          // Start polling as fallback
+          startPolling(roomCodeUpper);
         } else if (status === 'CLOSED') {
           console.warn('⚠️ Channel closed');
           setIsConnected(false);
@@ -131,7 +164,21 @@ export const useSupabaseGame = () => {
       console.log(`🔌 Unsubscribing from room: ${roomCodeUpper}`);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchRoomState]);
+
+  // Polling fallback when real-time fails
+  const startPolling = useCallback((code: string) => {
+    console.log('🔄 Starting polling fallback for room:', code);
+    const intervalId = setInterval(() => {
+      fetchRoomState(code);
+    }, 2000); // Poll every 2 seconds
+
+    // Store interval ID for cleanup
+    return () => {
+      clearInterval(intervalId);
+      console.log('🛑 Stopped polling for room:', code);
+    };
+  }, [fetchRoomState]);
 
   // Create a new room
   const createRoom = useCallback(async () => {
@@ -325,6 +372,16 @@ export const useSupabaseGame = () => {
     }
   }, [roomCode]);
 
+  // Polling fallback effect - only poll if real-time is not connected
+  useEffect(() => {
+    if (!roomCode || subscriptionStatus === 'SUBSCRIBED') return; // Don't poll if real-time is working
+    
+    console.log('🔄 Setting up polling fallback for room:', roomCode);
+    const cleanup = startPolling(roomCode);
+    
+    return cleanup;
+  }, [roomCode, subscriptionStatus, startPolling]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -339,6 +396,13 @@ export const useSupabaseGame = () => {
 
   const gameState = getGameState(room);
 
+  // Manual refresh function
+  const refreshRoom = useCallback(async () => {
+    if (!roomCode) return;
+    console.log('🔄 Manually refreshing room state...');
+    await fetchRoomState(roomCode);
+  }, [roomCode, fetchRoomState]);
+
   return {
     ...gameState,
     room, // Expose room object for checking player2_id and game_status
@@ -347,10 +411,12 @@ export const useSupabaseGame = () => {
     isConnected,
     isWaiting,
     error,
+    subscriptionStatus,
     createRoom,
     joinRoom,
     makeMove,
-    resetGame
+    resetGame,
+    refreshRoom
   };
 };
 
