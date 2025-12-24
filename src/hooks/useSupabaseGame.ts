@@ -106,12 +106,30 @@ export const useSupabaseGame = () => {
         },
         (payload) => {
           console.log('📨 Real-time update received:', payload);
+          console.log('  - Event type:', payload.eventType);
+          console.log('  - New data:', payload.new);
+          console.log('  - Old data:', payload.old);
+          
           if (payload.new) {
             const updatedRoom = payload.new as GameRoom;
             console.log('✅ Room updated via real-time:', updatedRoom);
             console.log('  - player2_id:', updatedRoom.player2_id);
             console.log('  - game_status:', updatedRoom.game_status);
-            setRoom(updatedRoom);
+            console.log('  - current_player:', updatedRoom.current_player);
+            console.log('  - board:', updatedRoom.board);
+            
+            // Only update if this is a different state (avoid unnecessary re-renders)
+            setRoom(prevRoom => {
+              if (prevRoom && 
+                  JSON.stringify(prevRoom.board) === JSON.stringify(updatedRoom.board) &&
+                  prevRoom.current_player === updatedRoom.current_player &&
+                  prevRoom.game_status === updatedRoom.game_status) {
+                console.log('  - No state change needed (already in sync)');
+                return prevRoom;
+              }
+              console.log('  - Updating room state');
+              return updatedRoom;
+            });
             
             // Update waiting state when game is ready
             const gameReady = updatedRoom.player2_id && updatedRoom.game_status === 'playing';
@@ -300,7 +318,10 @@ export const useSupabaseGame = () => {
 
   // Make a move
   const makeMove = useCallback(async (col: number) => {
-    if (!room || !roomCode || !playerNumber) return;
+    if (!room || !roomCode || !playerNumber) {
+      console.error('❌ Cannot make move: missing room, roomCode, or playerNumber');
+      return;
+    }
     
     if (room.current_player !== playerNumber) {
       setError('Not your turn');
@@ -337,16 +358,44 @@ export const useSupabaseGame = () => {
         updateData.winner = null;
       }
 
-      const { error } = await supabase
+      console.log('🎮 Making move:', { col, playerNumber, nextPlayer, winner, isDraw });
+      console.log('📤 Updating database with:', updateData);
+
+      // Optimistically update local state immediately for better UX
+      const optimisticRoom: GameRoom = {
+        ...room,
+        board: newBoard,
+        current_player: nextPlayer,
+        game_status: winner || isDraw ? 'finished' : 'playing',
+        winner: winner || null
+      };
+      setRoom(optimisticRoom);
+
+      // Update database
+      const { data, error } = await supabase
         .from('game_rooms')
         .update(updateData)
-        .eq('room_code', roomCode);
+        .eq('room_code', roomCode)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database update error:', error);
+        // Revert optimistic update on error
+        setRoom(room);
+        throw error;
+      }
+
+      if (data) {
+        console.log('✅ Database updated successfully:', data);
+        // Update with server response to ensure consistency
+        setRoom(data);
+      }
+
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to make move');
-      console.error('Error making move:', err);
+      console.error('❌ Error making move:', err);
     }
   }, [room, roomCode, playerNumber]);
 
