@@ -67,4 +67,3 @@ Update your frontend to connect to the deployed server URL.
 - ✅ Win/draw detection
 - ✅ Game reset
 - ✅ Disconnection handling
-

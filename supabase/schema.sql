@@ -49,3 +49,6 @@ CREATE POLICY "Anyone can update rooms" ON game_rooms
 CREATE POLICY "Anyone can delete rooms" ON game_rooms
   FOR DELETE USING (true);
 
+-- Enable Real-Time Replication for game_rooms table
+-- This is REQUIRED for real-time subscriptions to work
+ALTER PUBLICATION supabase_realtime ADD TABLE game_rooms;

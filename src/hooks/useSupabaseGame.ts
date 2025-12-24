@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, GameRoom } from '../lib/supabase';
-import { Board, Player, getBoardState, makeMove } from '../utils/gameLogic';
+import { Board, Player, getBoardState, makeMove as makeGameMove } from '../utils/gameLogic';
 import { GameStatus } from '../utils/constants';
 
 function generateRoomCode(): string {
@@ -44,6 +44,95 @@ export const useSupabaseGame = () => {
     };
   }, []);
 
+  // Subscribe to room updates - MUST be defined before createRoom/joinRoom
+  const subscribeToRoom = useCallback((code: string) => {
+    const roomCodeUpper = code.toUpperCase();
+    
+    // Remove any existing subscription for this room
+    const existingChannels = supabase.getChannels().filter(ch => 
+      ch.topic?.includes(`room:${roomCodeUpper}`) || ch.topic === `room:${roomCodeUpper}`
+    );
+    existingChannels.forEach(ch => supabase.removeChannel(ch));
+
+    console.log(`🔌 Subscribing to room: ${roomCodeUpper}`);
+
+    const channel = supabase
+      .channel(`room:${roomCodeUpper}`, {
+        config: {
+          broadcast: { self: true }
+        }
+      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'game_rooms',
+          filter: `room_code=eq.${roomCodeUpper}`
+        },
+        (payload) => {
+          console.log('📨 Real-time update received:', payload);
+          if (payload.new) {
+            const updatedRoom = payload.new as GameRoom;
+            console.log('✅ Room updated:', updatedRoom);
+            setRoom(updatedRoom);
+            
+            // Update waiting state when game is ready
+            const gameReady = updatedRoom.player2_id && updatedRoom.game_status === 'playing';
+            setIsWaiting(!gameReady);
+            
+            // Clear error if game is ready
+            if (gameReady) {
+              setError(null);
+            }
+          } else if (payload.old) {
+            console.log('⚠️ Room deleted or changed:', payload.old);
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        console.log(`📡 Subscription status for ${roomCodeUpper}:`, status);
+        if (err) {
+          console.error('❌ Subscription error:', err);
+          setError(`Connection error: ${err.message}`);
+        }
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to room updates');
+          setIsConnected(true);
+          // Fetch current room state after subscribing
+          supabase
+            .from('game_rooms')
+            .select('*')
+            .eq('room_code', roomCodeUpper)
+            .single()
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('❌ Error fetching room:', error);
+              } else if (data) {
+                console.log('📋 Current room state:', data);
+                setRoom(data);
+                const gameReady = data.player2_id && data.game_status === 'playing';
+                setIsWaiting(!gameReady);
+              }
+            });
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Channel error - Real-time may not be enabled');
+          setError('Real-time connection failed. Please check Supabase configuration.');
+        } else if (status === 'TIMED_OUT') {
+          console.error('❌ Subscription timed out');
+          setError('Connection timed out. Please try again.');
+        } else if (status === 'CLOSED') {
+          console.warn('⚠️ Channel closed');
+          setIsConnected(false);
+        }
+      });
+
+    return () => {
+      console.log(`🔌 Unsubscribing from room: ${roomCodeUpper}`);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   // Create a new room
   const createRoom = useCallback(async () => {
     try {
@@ -76,7 +165,7 @@ export const useSupabaseGame = () => {
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to create room');
-      console.error('Error creating room:', err);
+      console.error('❌ Error creating room:', err);
     }
   }, [subscribeToRoom]);
 
@@ -158,69 +247,9 @@ export const useSupabaseGame = () => {
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to join room');
-      console.error('Error joining room:', err);
+      console.error('❌ Error joining room:', err);
     }
   }, [subscribeToRoom]);
-
-  // Subscribe to room updates
-  const subscribeToRoom = useCallback((code: string) => {
-    // Remove any existing subscription for this room
-    const existingChannel = supabase.getChannels().find(ch => ch.topic === `room:${code}`);
-    if (existingChannel) {
-      supabase.removeChannel(existingChannel);
-    }
-
-    const channel = supabase
-      .channel(`room:${code}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'game_rooms',
-          filter: `room_code=eq.${code.toUpperCase()}`
-        },
-        (payload) => {
-          console.log('Room update received:', payload);
-          if (payload.new) {
-            const updatedRoom = payload.new as GameRoom;
-            setRoom(updatedRoom);
-            
-            // Update waiting state when game is ready
-            // Game is ready when both players are present and status is 'playing'
-            const gameReady = updatedRoom.player2_id && updatedRoom.game_status === 'playing';
-            setIsWaiting(!gameReady);
-            
-            // Clear error if game is ready
-            if (gameReady) {
-              setError(null);
-            }
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log('Subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          // Fetch current room state after subscribing
-          supabase
-            .from('game_rooms')
-            .select('*')
-            .eq('room_code', code.toUpperCase())
-            .single()
-            .then(({ data, error }) => {
-              if (!error && data) {
-                setRoom(data);
-                const gameReady = data.player2_id && data.game_status === 'playing';
-                setIsWaiting(!gameReady);
-              }
-            });
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
 
   // Make a move
   const makeMove = useCallback(async (col: number) => {
@@ -238,7 +267,7 @@ export const useSupabaseGame = () => {
 
     try {
       const board = room.board as Board;
-      const newBoard = makeMove(board, col, playerNumber as Player);
+      const newBoard = makeGameMove(board, col, playerNumber as Player);
 
       if (!newBoard) {
         setError('Invalid move');
